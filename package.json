@@ -1,0 +1,24 @@
+{
+  "name": "nairaquote",
+  "version": "0.1.0",
+  "description": "Inventory- and volatility-aware cNGN/USDT market-making agent for Textile FX on Celo mainnet",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "quote:once": "tsx src/index.ts --once",
+    "check:tag": "tsx scripts/check-tag.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@celo/attribution-tags": "^0.5.0",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
