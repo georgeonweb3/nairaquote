@@ -10,15 +10,24 @@ export interface Ticker {
 
 /** Public Textile book for USDT_NGN (NGN per USDT, net of fees at ~100 USDT). */
 export async function textileTicker(id = "USDT_NGN"): Promise<Ticker> {
-  const r = await fetch(`${TEXTILE_API}/tickers`);
+  // Bounded wait: a stalled feed must fail the tick, not hang the loop
+  // (observed live: an unbounded fetch stalled quote:once for over a minute).
+  const r = await fetch(`${TEXTILE_API}/tickers`, { signal: AbortSignal.timeout(10_000) });
   if (!r.ok) throw new Error(`textile tickers ${r.status}`);
   const rows = (await r.json()) as Array<Record<string, string>>;
   const t = rows.find((x) => x.ticker_id === id);
   if (!t) throw new Error(`ticker ${id} not found`);
+  const bid = Number(t.bid);
+  const ask = Number(t.ask);
+  // Reject malformed payloads here. NaN prices would otherwise flow into the
+  // mid and permanently poison the EWMA volatility state.
+  if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask < bid) {
+    throw new Error(`malformed ticker ${id}: bid=${t.bid} ask=${t.ask}`);
+  }
   return {
     ticker_id: id,
-    bid: Number(t.bid),
-    ask: Number(t.ask),
+    bid,
+    ask,
     last: Number(t.last_price),
     baseVolume24h: Number(t.base_volume),
   };

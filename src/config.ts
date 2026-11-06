@@ -1,5 +1,15 @@
 import type { Address } from "viem";
 
+// Load a local .env if present (Node built-in; no dependency). Shell-exported
+// variables take precedence — loadEnvFile never overrides ones already set.
+// Without this, nothing in the repo reads .env at all and every value in
+// .env.example would be silently ignored.
+try {
+  process.loadEnvFile();
+} catch {
+  // No .env file — fine, defaults and shell env still apply.
+}
+
 /**
  * ERC-8021 attribution code assigned by Loops for the Agents on Open Rails entry.
  * Every transaction from the agent wallet MUST carry it. Do not derive it from the repo.
@@ -25,7 +35,18 @@ export const TEXTILE_API = "https://api.textilecredit.com";
 export const TEXTILE_V2 = `${TEXTILE_API}/v2`;
 export const TEXTILE_FEE_BPS = 1;
 
-const num = (k: string, d: number) => (process.env[k] ? Number(process.env[k]) : d);
+const num = (k: string, d: number) => {
+  const raw = process.env[k];
+  if (raw === undefined) return d;
+  const v = Number(raw);
+  // A typo'd value must fail loud here. Letting NaN through would silently
+  // disable the caps below (every NaN comparison is false), and a negative
+  // spread/skew would quote through the mid.
+  if (!Number.isFinite(v) || v < 0) {
+    throw new Error(`Invalid ${k}="${raw}" — expected a finite number >= 0`);
+  }
+  return v;
+};
 
 export const PARAMS = {
   baseSpreadBps: num("BASE_SPREAD_BPS", 3), // floor half-spread each side

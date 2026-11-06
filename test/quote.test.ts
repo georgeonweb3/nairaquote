@@ -32,11 +32,41 @@ describe("quoting engine", () => {
     expect(priceQuote("taker_buys_usdt", 50, { mid, volBps: 500 }, balanced)).toBeNull();
   });
 
+  it("refuses requests above the per-quote share of payable inventory", () => {
+    // 200 USDT is under the 500 absolute cap but over 25% of the 500 USDT held.
+    expect(priceQuote("taker_buys_usdt", 200, { mid, volBps: 0 }, balanced)).toBeNull();
+    expect(priceQuote("taker_buys_usdt", 125, { mid, volBps: 0 }, balanced)).not.toBeNull();
+  });
+
+  it("refuses zero, negative and NaN request sizes", () => {
+    for (const size of [0, -10, Number.NaN]) {
+      expect(priceQuote("taker_buys_usdt", size, { mid, volBps: 0 }, balanced)).toBeNull();
+      expect(priceQuote("taker_sells_usdt", size, { mid, volBps: 0 }, balanced)).toBeNull();
+    }
+  });
+
+  it("halts when the book diverges sharply from the reference rate", () => {
+    // Reference 20% away from mid — far beyond the 1000 bps halt.
+    expect(priceQuote("taker_buys_usdt", 50, { mid, volBps: 0, refRate: mid * 0.8 }, balanced)).toBeNull();
+    // Reference ~2% away (typical official-vs-market gap) still quotes.
+    expect(priceQuote("taker_buys_usdt", 50, { mid, volBps: 0, refRate: mid * 0.98 }, balanced)).not.toBeNull();
+  });
+
   it("ewma vol is zero for a flat series and rises on moves", () => {
     const v = new EwmaVol();
     [mid, mid, mid].forEach((p) => v.update(p));
     expect(v.bps()).toBe(0);
     v.update(mid * 1.01);
+    expect(v.bps()).toBeGreaterThan(0);
+  });
+
+  it("ewma vol ignores unusable prices instead of poisoning its state", () => {
+    const v = new EwmaVol();
+    v.update(mid);
+    for (const bad of [Number.NaN, 0, -5, Number.POSITIVE_INFINITY]) v.update(bad);
+    expect(v.bps()).toBe(0);
+    v.update(mid * 1.01);
+    expect(Number.isFinite(v.bps())).toBe(true);
     expect(v.bps()).toBeGreaterThan(0);
   });
 });

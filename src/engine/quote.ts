@@ -54,6 +54,7 @@ export function priceQuote(
   p = PARAMS,
 ): Quote | null {
   if (!(m.mid > 0)) return null;
+  if (!(requestedUsdt > 0)) return null; // zero/negative/NaN size is not a quotable request
   if (m.refRate) {
     const divBps = (Math.abs(m.mid - m.refRate) / m.refRate) * 1e4;
     if (divBps > p.refDivergenceHaltBps) return null; // book far from reference: feed may be broken

@@ -33,5 +33,25 @@ async function tick() {
   );
 }
 
-await tick();
-if (!once) setInterval(() => tick().catch((e) => console.error(e)), 15_000);
+if (once) {
+  // One-shot mode: a failed tick should fail the command (non-zero exit).
+  await tick();
+} else {
+  // Loop mode: a transient feed failure must not kill the process before the
+  // interval starts, and a slow tick must never overlap the next one (they
+  // share the EWMA state).
+  let running = false;
+  const guarded = async () => {
+    if (running) return;
+    running = true;
+    try {
+      await tick();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      running = false;
+    }
+  };
+  await guarded();
+  setInterval(guarded, 15_000);
+}
