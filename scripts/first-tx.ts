@@ -1,9 +1,12 @@
 /**
- * First mainnet transaction: a 0-value self-transfer from the agent wallet.
+ * First mainnet transaction: a 0-value transfer from the agent wallet to
+ * George's main wallet (recipient set by George, 2026-11-07; override with
+ * the FIRST_TX_TO env var).
  *
  * Purpose: prove the ERC-8021 attribution tag rides on a real transaction
  * for the cheapest possible gas (21,000) BEFORE spending ~180k gas on the
- * ERC-8004 registration. Moves no value, has no counterparty.
+ * ERC-8004 registration. The tag lives in the tx data, so the value can
+ * stay 0 — nothing of George's moves, the counterparty is his own wallet.
  *
  * Run (with AGENT_PRIVATE_KEY in .env, wallet funded with CELO):
  *   npm run tx:first
@@ -14,6 +17,9 @@
 import { formatEther } from "viem";
 import { AGENT_ADDRESS } from "../src/config.js";
 import { agentWallet, assertTagged, publicClient } from "../src/wallet.js";
+
+const RECIPIENT = (process.env.FIRST_TX_TO ??
+  "0xfFDd2f83555c64d1CaA17f5646C08b80013ED38b") as `0x${string}`;
 
 const chainId = await publicClient.getChainId();
 if (chainId !== 42220) {
@@ -28,8 +34,8 @@ if (balance === 0n) {
 }
 
 const wallet = agentWallet();
-console.log("Sending 0-value self-transfer (tagged)...");
-const hash = await wallet.sendTransaction({ to: AGENT_ADDRESS, value: 0n });
+console.log(`Sending 0-value tagged transfer to ${RECIPIENT}...`);
+const hash = await wallet.sendTransaction({ to: RECIPIENT, value: 0n });
 console.log(`Tx sent: ${hash}`);
 
 const receipt = await publicClient.waitForTransactionReceipt({ hash });
