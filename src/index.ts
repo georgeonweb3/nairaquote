@@ -9,6 +9,7 @@ import {
   usdtShare,
   type Inventory,
 } from "./engine/quote.js";
+import { appendRecord } from "./engine/ledger.js";
 
 /**
  * Dry-run loop: reads the live Textile book, builds indicative two-sided quotes,
@@ -48,6 +49,28 @@ async function tick() {
   const size = quoteSizeUsdt(m, inv);
   const buy = priceQuote("taker_buys_usdt", size, m, inv);
   const sell = priceQuote("taker_sells_usdt", size, m, inv);
+
+  // Persist every answered quote to the ledger when a log path is set
+  // (NQ_TICK_LOG=data/ticks.jsonl). Fills are recorded by the maker loop
+  // when it lands; nothing here ever writes a fill.
+  const logPath = process.env.NQ_TICK_LOG;
+  if (logPath) {
+    for (const q of [buy, sell]) {
+      if (q) {
+        appendRecord(logPath, {
+          type: "quote",
+          at: new Date().toISOString(),
+          side: q.side,
+          sizeUsdt: size,
+          price: q.price,
+          mid,
+          reason: q.reason,
+          inventorySource,
+        });
+      }
+    }
+  }
+
   console.log(
     JSON.stringify({
       at: new Date().toISOString(),

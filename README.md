@@ -13,6 +13,7 @@ Most Textile fillers quote price ± fixed bips. NairaQuote prices every RFQ from
 - **Kill switches**: no quote when volatility pushes spread past a max, or when the book diverges sharply from the reference — and no quote at all when the reference feed itself is down, so the divergence guard is never silently bypassed.
 - **Real balances, honest fallback**: every tick reads the agent wallet's cNGN / USD₮ balances (`src/feeds/balances.ts`). Real balances drive inventory and skew the moment the wallet holds any; until then a paper inventory is used and every tick log states which source priced the quote.
 - **Explainable by default**: every quote carries a `reason` (spread decomposition, skew, size vs cap) and every refusal names the risk check that fired (`quoteHaltReason`).
+- **Ledger first**: every answered quote is recorded to a JSONL ledger (`src/engine/ledger.ts`, set `NQ_TICK_LOG`). P&L is computed only from recorded fills, marked against the mid at fill time and compared with a fixed-spread baseline — the way the track scores it. No fills, no P&L: the dashboard (`npm run dashboard`) says "no fills yet" rather than inventing numbers.
 
 The engine (`src/engine/quote.ts`) is a pure function, so it is unit-tested and can be replayed against history.
 
@@ -30,6 +31,8 @@ npm run typecheck   # tsc --noEmit
 npm run check:tag   # prints the ERC-8021 attribution tag and its data suffix
 npm run quote:once  # one dry-run tick against the live Textile book (no tx, no signing)
 npm run dev         # dry-run loop every 15s
+NQ_TICK_LOG=data/ticks.jsonl npm run dev   # also persist every answered quote to the ledger
+npm run dashboard   # read-only dashboard over the ledger (PORT, default 8787)
 ```
 
 No `.env` or key is needed for the dry-run commands. For anything wallet-related, copy `.env.example` to `.env` (loaded automatically; shell-exported variables take precedence) and set `AGENT_PRIVATE_KEY` — it must belong to the agent wallet above; `src/wallet.ts` refuses any other key.
@@ -40,10 +43,11 @@ Sample dry-run output (real tick, 2026-11-08; the indicative book arrived crosse
 ```
 
 ## Status
-- [x] Tagged wallet client, live Textile + reference feeds, quoting engine with tests (dry-run); reference-outage halt, per-decision reasons, dynamic size ladder, real balance readout with labelled paper fallback (21 tests)
+- [x] Tagged wallet client, live Textile + reference feeds, quoting engine with tests (dry-run); reference-outage halt, per-decision reasons, dynamic size ladder, real balance readout with labelled paper fallback (28 tests)
 - [ ] Textile maker enrolment + `WSS /v2/maker/stream` wiring
 - [x] ERC-8004 registration (agentId 10056) + first tagged mainnet tx
+- [x] Quote/fill ledger with P&L-vs-baseline math + read-only dashboard (fills populate once the maker loop is live)
 - [ ] Funded inventory (cNGN / USD₮ quoting capital)
-- [ ] Inventory band rebalancing, P&L dashboard
+- [ ] Inventory band rebalancing
 
 All code in this repository was written during the hackathon. MIT licensed.

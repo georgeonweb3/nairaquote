@@ -8,6 +8,7 @@
     "dev": "tsx src/index.ts",
     "quote:once": "tsx src/index.ts --once",
     "check:tag": "tsx scripts/check-tag.ts",
+    "dashboard": "tsx scripts/dashboard.ts",
     "tx:first": "tsx scripts/first-tx.ts",
     "register:agent": "tsx scripts/register-agent.ts",
     "test": "vitest run",
