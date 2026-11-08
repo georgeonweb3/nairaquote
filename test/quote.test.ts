@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { inventorySkewBps, priceQuote, halfSpreadBps } from "../src/engine/quote.js";
+import {
+  inventorySkewBps,
+  priceQuote,
+  halfSpreadBps,
+  quoteHaltReason,
+  quoteSizeUsdt,
+} from "../src/engine/quote.js";
 import { EwmaVol } from "../src/engine/volatility.js";
 
 const mid = 1384;
@@ -50,6 +56,52 @@ describe("quoting engine", () => {
     expect(priceQuote("taker_buys_usdt", 50, { mid, volBps: 0, refRate: mid * 0.8 }, balanced)).toBeNull();
     // Reference ~2% away (typical official-vs-market gap) still quotes.
     expect(priceQuote("taker_buys_usdt", 50, { mid, volBps: 0, refRate: mid * 0.98 }, balanced)).not.toBeNull();
+  });
+
+  it("explains every decision: reason on quotes, halt reason on refusals", () => {
+    const q = priceQuote("taker_buys_usdt", 50, { mid, volBps: 0 }, balanced)!;
+    expect(q.reason).toContain("quoted:");
+    expect(q.reason).toContain("skew");
+    // Divergence halt names itself.
+    expect(
+      quoteHaltReason("taker_buys_usdt", 50, { mid, volBps: 0, refRate: mid * 0.8 }, balanced),
+    ).toContain("divergence");
+    // Volatility halt names itself.
+    expect(
+      quoteHaltReason("taker_buys_usdt", 50, { mid, volBps: 500 }, balanced),
+    ).toContain("half-spread");
+    // Oversize halt names the cap.
+    expect(
+      quoteHaltReason("taker_buys_usdt", 200, { mid, volBps: 0 }, balanced),
+    ).toContain("per-quote cap");
+  });
+
+  it("priceQuote refuses exactly when quoteHaltReason fires", () => {
+    const scenarios: Array<[Parameters<typeof priceQuote>[2], number]> = [
+      [{ mid, volBps: 0 }, 50],
+      [{ mid, volBps: 0, refRate: mid * 0.8 }, 50],
+      [{ mid, volBps: 500 }, 50],
+      [{ mid, volBps: 0 }, 10_000],
+      [{ mid, volBps: 0 }, 0],
+    ];
+    for (const [m, size] of scenarios) {
+      for (const side of ["taker_buys_usdt", "taker_sells_usdt"] as const) {
+        expect(priceQuote(side, size, m, balanced) === null).toBe(
+          quoteHaltReason(side, size, m, balanced) !== null,
+        );
+      }
+    }
+  });
+
+  it("sizes quotes by inventory, volatility and skew", () => {
+    // Balanced paper-sized inventory, calm: the 100 USDT step (cap is 125).
+    expect(quoteSizeUsdt({ mid, volBps: 0 }, balanced)).toBe(100);
+    // Deep inventory, calm and balanced: the ladder tops out at the 500 cap.
+    expect(quoteSizeUsdt({ mid, volBps: 0 }, { usdt: 5000, cngn: 5000 * mid })).toBe(500);
+    // Elevated volatility steps size down.
+    expect(quoteSizeUsdt({ mid, volBps: 40 }, { usdt: 5000, cngn: 5000 * mid })).toBe(50);
+    // Heavy skew steps size down even with deep inventory.
+    expect(quoteSizeUsdt({ mid, volBps: 0 }, { usdt: 9000, cngn: 1000 * mid })).toBe(100);
   });
 
   it("ewma vol is zero for a flat series and rises on moves", () => {

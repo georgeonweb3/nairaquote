@@ -1,25 +1,53 @@
 import { textileTicker } from "./feeds/textile.js";
 import { referenceNgnPerUsd } from "./feeds/reference.js";
+import { agentBalances, selectInventory } from "./feeds/balances.js";
 import { EwmaVol } from "./engine/volatility.js";
-import { priceQuote, usdtShare, type Inventory } from "./engine/quote.js";
+import {
+  priceQuote,
+  quoteHaltReason,
+  quoteSizeUsdt,
+  usdtShare,
+  type Inventory,
+} from "./engine/quote.js";
 
 /**
  * Dry-run loop: reads the live Textile book, builds indicative two-sided quotes,
- * and logs them. Sends NO transactions and signs nothing.
+ * and logs them with the reason for every decision. Sends NO transactions and
+ * signs nothing.
  * Maker stream wiring (WSS /v2/maker/stream) lands once Textile enables the maker.
+ *
+ * Risk posture: a tick quotes only with BOTH feeds healthy. If the reference
+ * feed fails, the tick halts instead of quoting without the divergence guard
+ * (an earlier version caught the error and quoted anyway — that bypass is gone).
+ * Inventory comes from the agent wallet's real cNGN/USDT balances when it
+ * holds any; until then a paper inventory is used and the log says so.
  */
 const once = process.argv.includes("--once");
 const vol = new EwmaVol();
-// Paper inventory until the agent wallet is funded.
-const inv: Inventory = { usdt: 500, cngn: 500 * 1384 };
+// Paper inventory until the agent wallet holds corridor tokens.
+const paperInv: Inventory = { usdt: 500, cngn: 500 * 1384 };
 
 async function tick() {
-  const [t, ref] = await Promise.all([textileTicker(), referenceNgnPerUsd().catch(() => undefined)]);
+  const [t, ref, bal] = await Promise.all([
+    textileTicker(),
+    referenceNgnPerUsd(), // no catch: an outage halts the tick, by design
+    agentBalances().catch(() => undefined), // a failed read falls back to paper, logged below
+  ]);
   const mid = (t.bid + t.ask) / 2;
   const volBps = vol.update(mid);
-  const m = { mid, volBps, refRate: ref?.rate };
-  const buy = priceQuote("taker_buys_usdt", 100, m, inv);
-  const sell = priceQuote("taker_sells_usdt", 100, m, inv);
+  const m = { mid, volBps, refRate: ref.rate };
+
+  let inv = paperInv;
+  let inventorySource = "paper — balance read failed";
+  if (bal) {
+    const sel = selectInventory(bal, paperInv);
+    inv = sel.inv;
+    inventorySource = sel.source;
+  }
+
+  const size = quoteSizeUsdt(m, inv);
+  const buy = priceQuote("taker_buys_usdt", size, m, inv);
+  const sell = priceQuote("taker_sells_usdt", size, m, inv);
   console.log(
     JSON.stringify({
       at: new Date().toISOString(),
@@ -34,11 +62,22 @@ async function tick() {
           ? { crossedBps: +(((t.bid - t.ask) / mid) * 10_000).toFixed(2) }
           : {}),
       },
-      ref: ref?.rate,
+      ref: ref.rate,
       mid: +mid.toFixed(2),
       volBps: +volBps.toFixed(2),
+      wallet: bal && {
+        celo: +bal.celo.toFixed(4),
+        cngn: bal.cngn,
+        usdt: bal.usdt,
+      },
+      inventorySource,
+      sizeUsdt: size,
       usdtShare: +usdtShare(inv, mid).toFixed(3),
       ours: { bid: sell && +sell.price.toFixed(2), ask: buy && +buy.price.toFixed(2) },
+      reasons: {
+        bid: sell?.reason ?? quoteHaltReason("taker_sells_usdt", size, m, inv),
+        ask: buy?.reason ?? quoteHaltReason("taker_buys_usdt", size, m, inv),
+      },
     }),
   );
 }
