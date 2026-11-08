@@ -15,7 +15,7 @@ Most Textile fillers quote price ± fixed bips. NairaQuote prices every RFQ from
 The engine (`src/engine/quote.ts`) is a pure function, so it is unit-tested and can be replayed against history.
 
 ## Onchain
-- Agent wallet: `0xBdC026bA914e399f367DC880ebA1EF268Ada5938` — [view on Celoscan](https://celoscan.io/address/0xBdC026bA914e399f367DC880ebA1EF268Ada5938)
+- Agent wallet: `0x0A8dE1EEd0722C05f3f1DD16F289f63274A5A40b` — [view on Celoscan](https://celoscan.io/address/0x0A8dE1EEd0722C05f3f1DD16F289f63274A5A40b)
 - ERC-8021 attribution: every transaction will be tagged `celo_1491b3c3f297` via `withAttribution` where the wallet client is built (`src/wallet.ts`). Verify the suffix any time with `npm run check:tag`.
 - ERC-8004 identity: registry `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432` — [view on Celoscan](https://celoscan.io/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432) (**registration pending**: the wallet is not registered yet and holds no registry NFT; registration needs a funded wallet).
 

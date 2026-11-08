@@ -17,7 +17,7 @@ try {
 export const ATTRIBUTION_TAG = "celo_1491b3c3f297" as const;
 
 export const CHAIN_ID = 42220; // Celo mainnet
-export const AGENT_ADDRESS: Address = "0xBdC026bA914e399f367DC880ebA1EF268Ada5938";
+export const AGENT_ADDRESS: Address = "0x0A8dE1EEd0722C05f3f1DD16F289f63274A5A40b";
 
 /** Verify against docs.textilecredit.com/protocol/address-book.html before use. */
 export const ADDR = {
