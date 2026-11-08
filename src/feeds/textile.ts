@@ -21,8 +21,20 @@ export async function textileTicker(id = "USDT_NGN"): Promise<Ticker> {
   const ask = Number(t.ask);
   // Reject malformed payloads here. NaN prices would otherwise flow into the
   // mid and permanently poison the EWMA volatility state.
-  if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask < bid) {
+  if (!Number.isFinite(bid) || !Number.isFinite(ask) || bid <= 0 || ask <= 0) {
     throw new Error(`malformed ticker ${id}: bid=${t.bid} ask=${t.ask}`);
+  }
+  // Textile's public book is an indicative snapshot across many fillers and
+  // is routinely crossed by a few bps (observed live, repeatedly). The engine
+  // consumes only the mid and guards it against an independent reference
+  // rate, so a small cross is market noise, not bad data — rejecting it made
+  // every other tick fail. A large cross (> 25 bps of mid) still means the
+  // snapshot is garbage and is rejected like any other malformed payload.
+  const mid = (bid + ask) / 2;
+  if (ask < bid && ((bid - ask) / mid) * 10_000 > 25) {
+    throw new Error(
+      `malformed ticker ${id}: crossed by ${(((bid - ask) / mid) * 10_000).toFixed(1)} bps (bid=${t.bid} ask=${t.ask})`,
+    );
   }
   return {
     ticker_id: id,

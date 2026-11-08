@@ -23,7 +23,17 @@ async function tick() {
   console.log(
     JSON.stringify({
       at: new Date().toISOString(),
-      book: { bid: t.bid, ask: t.ask, vol24hUsdt: t.baseVolume24h },
+      book: {
+        bid: t.bid,
+        ask: t.ask,
+        vol24hUsdt: t.baseVolume24h,
+        // Present only when the indicative book arrived crossed (small
+        // crosses are accepted — see feeds/textile.ts); kept in the log so
+        // the data quality of every tick stays auditable.
+        ...(t.ask < t.bid
+          ? { crossedBps: +(((t.bid - t.ask) / mid) * 10_000).toFixed(2) }
+          : {}),
+      },
       ref: ref?.rate,
       mid: +mid.toFixed(2),
       volBps: +volBps.toFixed(2),

@@ -32,9 +32,9 @@ npm run dev         # dry-run loop every 15s
 
 No `.env` or key is needed for the dry-run commands. For anything wallet-related, copy `.env.example` to `.env` (loaded automatically; shell-exported variables take precedence) and set `AGENT_PRIVATE_KEY` — it must belong to the agent wallet above; `src/wallet.ts` refuses any other key.
 
-Sample dry-run output (real tick, 2026-11-06):
+Sample dry-run output (real tick, 2026-11-08; the indicative book arrived crossed by 1.31 bps and was accepted — small crosses are normal for this multi-filler snapshot, see `src/feeds/textile.ts`):
 ```json
-{"at":"2026-11-06T22:52:58.314Z","book":{"bid":1374.7,"ask":1375.41,"vol24hUsdt":1462925.48},"ref":1348.02,"mid":1375.06,"volBps":0,"usdtShare":0.498,"ours":{"bid":1374.48,"ask":1375.69}}
+{"at":"2026-11-08T21:07:54.282Z","book":{"bid":1378.74,"ask":1378.56,"vol24hUsdt":762593.32,"crossedBps":1.31},"ref":1347.74,"mid":1378.65,"volBps":0,"usdtShare":0.499,"ours":{"bid":1378.06,"ask":1379.27}}
 ```
 
 ## Status
